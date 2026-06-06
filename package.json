@@ -1,0 +1,14 @@
+{
+  "name": "logo-as-code-skill",
+  "version": "1.0.0",
+  "description": "Claude Code skill: turn a hand-drawn logo into smooth cubic-Bezier code, SVG variants, and PNG/ICO exports.",
+  "scripts": {
+    "rasterize": "node scripts/rasterize.js"
+  },
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5"
+  }
+}

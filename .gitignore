@@ -1,0 +1,8 @@
+node_modules/
+# regenerable raster/icon exports from the example (SVGs are kept as proof)
+examples/chan-monkey/out/raster/
+examples/chan-monkey/out/icons/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
