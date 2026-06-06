@@ -95,6 +95,12 @@ VARIANTS = [
     ("monkey/chan-meng-monkey-white-on-black.svg",    WHITE, BLACK, False),
     ("monkey/chan-meng-monkey-black-transparent.svg", BLACK, None,  False),
     ("monkey/chan-meng-monkey-white-transparent.svg", WHITE, None,  False),
+    # Theme-adaptive: one inline-SVG file whose ink follows the host's CSS `color`
+    # (transparent background). Additive — it collapses only the ink axis, so it
+    # complements the explicit matrix above, it doesn't replace it. See
+    # references/layer-structure.md.
+    ("web/chan-meng-logo-currentColor.svg",   "currentColor", None, True),
+    ("web/chan-meng-monkey-currentColor.svg", "currentColor", None, False),
 ]
 
 

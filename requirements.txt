@@ -1,0 +1,7 @@
+# OPTIONAL — only for the AI showcase step (scripts/generate_showcase.py).
+# The core skill (vectorize.py, build_gallery.py) is Python standard library only and
+# needs NONE of this. Install only if you want premium showcase renders:
+#   pip install -r requirements.txt
+google-genai>=0.2.0
+python-dotenv>=1.0.0
+Pillow>=10.0.0

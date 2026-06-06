@@ -2,6 +2,13 @@ node_modules/
 # regenerable raster/icon exports from the example (SVGs are kept as proof)
 examples/chan-monkey/out/raster/
 examples/chan-monkey/out/icons/
+# regenerable review gallery + AI showcase renders (regenerate from build_gallery.py /
+# generate_showcase.py)
+examples/chan-monkey/gallery.html
+examples/chan-monkey/out/showcase/
+output/
+# optional showcase step secrets / deps
+.env
 __pycache__/
 *.pyc
 .DS_Store

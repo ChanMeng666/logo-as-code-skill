@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--
+      gallery_template.html — a self-contained review gallery for a vectorized logo.
+
+      This is a TEMPLATE. `scripts/build_gallery.py` reads it, fills the placeholders
+      below from a logo's build.py + its emitted SVGs, and writes a ready `gallery.html`.
+      Do not edit per logo — edit the build_gallery.py CONFIG block instead.
+
+      Placeholders filled by build_gallery.py (each wrapped in double curly braces):
+        PRODUCT_NAME, TAGLINE, YEAR
+        ORIGINAL_SVG, RECONSTRUCTION_SVG   (inline svg, backgrounds stripped)
+        CONTOUR_TABLE, RECON_STATS
+        VARIANT_CARDS, SHOWCASE_SECTION
+
+      The page has three jobs:
+        1. COMPARE — original hand-drawing vs the fitted reconstruction, with a
+           side-by-side / overlay / difference view to make deviations obvious. This
+           is the visual-tuning (Step 4) tool: spot a wobble, find its contour in the
+           tuning table, adjust (step, passes), re-run build.py + build_gallery.py.
+        2. MATRIX — every emitted colour/layout variant, drop-in inspectable.
+        3. SHOWCASE — optional AI showcase renders, if generated.
+    -->
+    <title>{{PRODUCT_NAME}} — Logo Reconstruction Review</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --ink: #1A1A1A;
+            --orig-tint: #E0245E;   /* original drawn outline, tinted for overlay */
+            --recon-tint: #1A1A1A;  /* fitted reconstruction */
+            --orig-opacity: 0.5;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background: #FAFAFA;
+            color: var(--ink);
+            overflow-x: hidden;
+        }
+
+        .font-mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+
+        /* Subtle grain texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        .tracking-ultra { letter-spacing: 0.25em; }
+
+        /* ---- Checkerboard so transparent variants read clearly ---- */
+        .checker {
+            background-image:
+                linear-gradient(45deg, #eee 25%, transparent 25%),
+                linear-gradient(-45deg, #eee 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #eee 75%),
+                linear-gradient(-45deg, transparent 75%, #eee 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+            background-color: #fafafa;
+        }
+
+        /* ---- Comparison area ---- */
+        .compare-stage { transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        .compare-stage svg { width: 100%; height: 100%; display: block; }
+
+        /* Tint each layer's shapes regardless of their baked-in fills.
+           Presentation `fill=""` attributes are overridden by CSS. */
+        .layer-original svg :is(path, circle, rect, polygon, ellipse) { fill: var(--orig-tint); }
+        .layer-recon    svg :is(path, circle, rect, polygon, ellipse) { fill: var(--recon-tint); }
+
+        /* Side-by-side: two panes */
+        .mode-side .pane { display: block; }
+        .mode-side .layer-original { opacity: 1; }
+
+        /* Overlay & difference: stack the two layers in one box */
+        .mode-overlay .stack, .mode-diff .stack { position: relative; }
+        .mode-overlay .stack .pane, .mode-diff .stack .pane {
+            position: absolute; inset: 0;
+        }
+        .mode-overlay .layer-original { opacity: var(--orig-opacity); }
+        .mode-diff .layer-original { opacity: 1; mix-blend-mode: difference; }
+        .mode-diff .layer-original svg :is(path, circle, rect, polygon, ellipse) { fill: #fff; }
+        .mode-diff .layer-recon    svg :is(path, circle, rect, polygon, ellipse) { fill: #fff; }
+        .mode-diff .stack { background: #000; }
+        /* In difference mode, perfectly-aligned ink cancels to black;
+           any deviation glows white — a pure-CSS "diff". */
+
+        .seg { /* segmented control buttons */
+            font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+            padding: 7px 14px; border: 1px solid rgba(0,0,0,0.15);
+            background: #fff; cursor: pointer; transition: all 0.2s ease;
+        }
+        .seg:hover { border-color: rgba(0,0,0,0.4); }
+        .seg.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+        /* ---- Variant cards ---- */
+        .logo-card { transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+        .logo-card:hover { transform: translateY(-4px); }
+        .logo-canvas { transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+        .logo-card:hover .logo-canvas { transform: scale(1.04); }
+        .logo-aura {
+            position: absolute; inset: 0;
+            background: radial-gradient(circle, rgba(0,0,0,0.10) 0%, transparent 70%);
+            transform: scale(0.5); opacity: 0; filter: blur(40px);
+            transition: all 1s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none;
+        }
+        .logo-card:hover .logo-aura { transform: scale(1); opacity: 1; }
+        .card-canvas svg { width: 100%; height: 100%; display: block; }
+        .divider-line {
+            width: 0; height: 1px; background: var(--ink); opacity: 0.2;
+            transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .logo-card:hover .divider-line { width: 100%; }
+
+        /* ---- Showcase images ---- */
+        .showcase-img {
+            transition: transform 0.5s ease, box-shadow 0.5s ease;
+            border-radius: 8px; overflow: hidden;
+        }
+        .showcase-img:hover {
+            transform: scale(1.02); box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen flex flex-col items-center py-20 px-6">
+
+        <!-- Header -->
+        <header class="text-center mb-16 max-w-3xl">
+            <h1 class="text-5xl md:text-6xl font-extralight tracking-wider mb-5">{{PRODUCT_NAME}}</h1>
+            <p class="font-mono text-xs opacity-40 uppercase tracking-ultra mb-7">{{TAGLINE}}</p>
+            <div class="w-12 h-px bg-[#1A1A1A] mx-auto opacity-30"></div>
+        </header>
+
+        <!-- ============ 1. COMPARE / QA ============ -->
+        <section class="w-full max-w-5xl mb-28">
+            <div class="flex items-baseline justify-between mb-2 flex-wrap gap-3">
+                <h2 class="text-sm font-medium uppercase tracking-ultra">Fidelity check</h2>
+                <div class="flex gap-px" id="modeControls">
+                    <button class="seg active" data-mode="side">Side&nbsp;by&nbsp;side</button>
+                    <button class="seg" data-mode="overlay">Overlay</button>
+                    <button class="seg" data-mode="diff">Difference</button>
+                </div>
+            </div>
+            <p class="text-xs opacity-50 font-light mb-6 max-w-2xl">
+                Original hand-drawing (left / tinted) vs the fitted Bézier reconstruction.
+                Use <em>Overlay</em> to onion-skin them and <em>Difference</em> to make any
+                deviation glow. A wobble you don't want? Find its contour in the tuning
+                table and lower its <span class="font-mono">step</span>/<span class="font-mono">passes</span>.
+            </p>
+
+            <div id="stage" class="compare-stage mode-side">
+                <!-- side-by-side wrapper -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="sideWrap">
+                    <figure>
+                        <div class="checker rounded-lg aspect-square flex items-center justify-center p-6 pane layer-original">
+                            {{ORIGINAL_SVG}}
+                        </div>
+                        <figcaption class="font-mono text-[11px] opacity-50 mt-2 text-center uppercase tracking-widest">Original</figcaption>
+                    </figure>
+                    <figure>
+                        <div class="checker rounded-lg aspect-square flex items-center justify-center p-6 pane layer-recon">
+                            {{RECONSTRUCTION_SVG}}
+                        </div>
+                        <figcaption class="font-mono text-[11px] opacity-50 mt-2 text-center uppercase tracking-widest">Reconstruction</figcaption>
+                    </figure>
+                </div>
+                <!-- overlay/difference wrapper (clones injected by JS) -->
+                <div class="hidden" id="overlayWrap">
+                    <div class="checker rounded-lg aspect-square max-w-xl mx-auto p-6 stack"></div>
+                    <div class="flex items-center gap-3 mt-4 max-w-xl mx-auto" id="opacityRow">
+                        <span class="font-mono text-[11px] opacity-50 uppercase tracking-widest">Original</span>
+                        <input type="range" min="0" max="100" value="50" id="opacity" class="flex-1 accent-[#E0245E]">
+                        <span class="font-mono text-[11px] opacity-50" id="opacityVal">50%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tuning + stats -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-10">
+                <div class="lg:col-span-2">
+                    <h3 class="font-mono text-[11px] opacity-50 uppercase tracking-widest mb-3">Per-contour tuning</h3>
+                    <table class="w-full text-sm font-light border-collapse">
+                        <thead>
+                            <tr class="text-[11px] uppercase tracking-widest opacity-40 text-left border-b border-black/10">
+                                <th class="py-2 pr-4 font-medium">Contour</th>
+                                <th class="py-2 pr-4 font-medium">Resample step (px)</th>
+                                <th class="py-2 font-medium">Smoothing passes</th>
+                            </tr>
+                        </thead>
+                        <tbody class="font-mono text-xs">
+                            {{CONTOUR_TABLE}}
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <h3 class="font-mono text-[11px] opacity-50 uppercase tracking-widest mb-3">Reconstruction</h3>
+                    <div class="flex flex-wrap gap-2">{{RECON_STATS}}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ 2. VARIANT MATRIX ============ -->
+        <section class="w-full max-w-7xl mb-28">
+            <h2 class="text-sm font-medium uppercase tracking-ultra mb-1 text-center">Variant matrix</h2>
+            <p class="text-xs opacity-50 font-light mb-12 text-center">One math definition → every brand-ready file.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12">
+                {{VARIANT_CARDS}}
+            </div>
+        </section>
+
+        <!-- ============ 3. SHOWCASE (optional) ============ -->
+        {{SHOWCASE_SECTION}}
+
+        <!-- Footer -->
+        <footer class="mt-16 text-center">
+            <p class="font-mono text-[11px] opacity-40 uppercase tracking-ultra leading-loose">
+                Vectorized with logo-as-code<br>{{YEAR}}
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        (function () {
+            const stage = document.getElementById('stage');
+            const sideWrap = document.getElementById('sideWrap');
+            const overlayWrap = document.getElementById('overlayWrap');
+            const stack = overlayWrap.querySelector('.stack');
+            const opacity = document.getElementById('opacity');
+            const opacityVal = document.getElementById('opacityVal');
+            const opacityRow = document.getElementById('opacityRow');
+
+            // Build the overlay stack once by cloning the two side-by-side panes.
+            const origPane = sideWrap.querySelector('.layer-original').cloneNode(true);
+            const reconPane = sideWrap.querySelector('.layer-recon').cloneNode(true);
+            origPane.classList.add('pane'); reconPane.classList.add('pane');
+            origPane.classList.remove('checker', 'rounded-lg', 'aspect-square', 'p-6');
+            reconPane.classList.remove('checker', 'rounded-lg', 'aspect-square', 'p-6');
+            stack.appendChild(reconPane);   // reconstruction underneath
+            stack.appendChild(origPane);    // original on top (tinted / blended)
+
+            function setMode(mode) {
+                stage.classList.remove('mode-side', 'mode-overlay', 'mode-diff');
+                stage.classList.add('mode-' + mode);
+                const overlay = (mode === 'overlay' || mode === 'diff');
+                sideWrap.classList.toggle('hidden', overlay);
+                overlayWrap.classList.toggle('hidden', !overlay);
+                opacityRow.style.visibility = (mode === 'overlay') ? 'visible' : 'hidden';
+                document.querySelectorAll('#modeControls .seg').forEach(b =>
+                    b.classList.toggle('active', b.dataset.mode === mode));
+            }
+
+            document.querySelectorAll('#modeControls .seg').forEach(btn =>
+                btn.addEventListener('click', () => setMode(btn.dataset.mode)));
+
+            opacity.addEventListener('input', () => {
+                document.documentElement.style.setProperty('--orig-opacity', opacity.value / 100);
+                opacityVal.textContent = opacity.value + '%';
+            });
+
+            setMode('side');
+        })();
+    </script>
+</body>
+</html>

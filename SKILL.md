@@ -1,6 +1,6 @@
 ---
 name: vectorizing-handdrawn-logos
-description: Use when turning a hand-drawn, sketched, or scanned logo into clean reproducible code — fitting smooth cubic Bézier curves to the real outline to produce an editable SVG, color/layout variants, and PNG/ICO/favicon exports. For brand logos, monkey/mascot marks, wordmarks, avatars, or any artwork that should become a parametric, infinitely scalable, version-controlled asset instead of a flat image.
+description: Use when turning a hand-drawn, sketched, or scanned logo into clean reproducible code — fitting smooth cubic Bézier curves to the real outline to produce an editable SVG, color/layout variants, an interactive side-by-side/difference review gallery, PNG/ICO/favicon exports, and optional AI showcase renders. For brand logos, monkey/mascot marks, wordmarks, avatars, or any artwork that should become a parametric, infinitely scalable, version-controlled asset instead of a flat image. This reconstructs an existing drawing; it does not generate brand-new logo designs from scratch.
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
@@ -43,9 +43,14 @@ only need recoloring (just edit the SVG directly).
 
 - `scripts/vectorize.py` — the **generic engine** (stdlib only). Importable library of
   the fit pipeline + SVG emission. You do **not** edit this per logo.
+- `scripts/build_gallery.py` — generic, stdlib-only **review-gallery generator**: builds a
+  self-contained `gallery.html` (original vs reconstruction comparison + variant matrix).
 - `scripts/rasterize.js` — generic SVG → PNG/ICO/favicon exporter (sharp + png-to-ico).
+- `scripts/generate_showcase.py` — **optional** AI showcase renders (Gemini / Nano Banana).
+  The only part that needs Python deps + an API key; everything else is dependency-free.
+- `assets/gallery_template.html` — the gallery template `build_gallery.py` fills.
 - `examples/chan-monkey/build.py` — a complete **worked example**; the template to copy.
-- `references/` — the math, the tuning guide, the layer-mapping guide, bitmap input.
+- `references/` — the math, tuning, layer-mapping, bitmap input, quality checklist, showcase styles.
 
 ## Workflow
 
@@ -81,20 +86,27 @@ Reuse the engine's primitives — `tokenize_path`, `load_svg_paths`, `fit_contou
 
 ### 4. Build, compare visually, and tune
 
-Run `python build.py` to emit the SVG(s). **Render and compare to the original**
-(overlay or side-by-side; a diff PNG of original vs reconstruction makes mismatches
-obvious). Adjust each contour's `(step, passes)` and re-run:
+Run `python build.py` to emit the SVG(s), then `python scripts/build_gallery.py` (point
+its CONFIG block at this logo's `build.py`) to write a self-contained `gallery.html`.
+**Open it and compare to the original**: the gallery's **Side-by-side / Overlay /
+Difference** views make mismatches obvious — in *Difference* mode aligned ink cancels to
+black and any deviation glows. Its per-contour tuning table maps each visible wobble to
+the knob to turn. Adjust each contour's `(step, passes)` and re-run `build.py` +
+`build_gallery.py`:
 - too rough / jittery → raise `passes` or `step`;
 - lost detail / too round → lower `step` and/or `passes`.
 
 See `references/tuning-guide.md`. Iterate until faithful. This is the one step that
-benefits from the user's eye — show them the comparison.
+benefits from the user's eye — show them the gallery.
 
 ### 5. Fan out the variant matrix
 
 Extend `VARIANTS` for the color schemes and layouts the brand needs (e.g. black/white
 ink × white/black/transparent background × full-lockup/mark-only). One math
-definition, many ready files.
+definition, many ready files. Optionally add a single **theme-adaptive** row with
+`ink="currentColor"` + `background=None` — an inline-SVG whose color follows the host's
+CSS (great with `prefers-color-scheme`). It's additive (collapses only the ink axis,
+inline-only), not a replacement for the matrix — see `references/layer-structure.md`.
 
 ### 6. Rasterize to PNG / ICO / favicon
 
@@ -102,19 +114,41 @@ Point the CONFIG block in `scripts/rasterize.js` at the logo's SVGs, then
 `npm install` (first time) and `npm run rasterize`. Produces square transparent PNGs,
 wide PNGs, a multi-size `favicon.ico`, an Apple touch icon, and web-manifest icons.
 
-### 7. Lay out a clean, documented repo
+### 6.5. Generate showcase images (optional — needs network + an API key)
 
-Organize as `assets/` (the SVG + raster outputs), `src/` (build.py + the two
-scripts), `archive/` (the original drawing), `docs/` (a short math write-up — model it
-on `references/method.md`), and a `README.md`. Everything regenerates from `build.py`,
-so the repo stays fully reproducible.
+For presentation-ready brand renders, composite the mark onto premium backgrounds with
+`scripts/generate_showcase.py` (Gemini / Nano Banana). This is the **only** step with
+external dependencies: `cp .env.example .env` and add `GEMINI_API_KEY`, then
+`pip install -r requirements.txt`. Feed a **transparent** raster variant from step 6
+(matching the background's polarity):
+
+```bash
+python scripts/generate_showcase.py "Brand Name" out/raster/monkey-black-512.png \
+    --all-styles --output-dir assets/showcase
+```
+
+The prompt forces the model to reproduce the mark **faithfully** (recolor + composite
+only — never redraw). Pick styles from `references/showcase-styles.md`. Skip this step
+entirely if you don't want the dependency — the rest of the skill is unaffected.
+
+### 7. Run the quality checklist, then lay out a clean repo
+
+Before delivering, walk `references/quality-checklist.md` — the fidelity gate (curve
+sanity, holes, circles, variant consistency, faithful rasters/showcase). Then organize
+as `assets/` (the SVG + raster + showcase outputs), `src/` (build.py + the scripts),
+`archive/` (the original drawing), `docs/` (a short math write-up — model it on
+`references/method.md`), the `gallery.html`, and a `README.md`. Everything regenerates
+from `build.py` (+ `build_gallery.py` / `rasterize.js`), so the repo stays fully
+reproducible.
 
 ## References (read when you reach that step)
 
 - `references/method.md` — the full mathematical method and why it stays smooth & full.
-- `references/layer-structure.md` — contour roles, holes, the `even-odd` knockout, circles.
+- `references/layer-structure.md` — contour roles, holes, the `even-odd` knockout, circles, `currentColor`.
 - `references/tuning-guide.md` — choosing `(resample_step, smoothing_passes)`; fidelity vs smoothness.
 - `references/bitmap-input.md` — turning a scan/photo into a polyline SVG first.
+- `references/quality-checklist.md` — the fidelity gate to run before delivery (step 7).
+- `references/showcase-styles.md` — the 12 premium backgrounds for the optional showcase (step 6.5).
 
 ## Common mistakes
 
@@ -124,6 +158,10 @@ so the repo stays fully reproducible.
   the SVG first if it has lowercase commands or `A` arcs.
 - **Forgetting `even-odd`.** Inner contours only become see-through holes when their
   group is one path with `fill-rule="evenodd"`.
-- **Tuning blind.** Always compare to the original visually before locking parameters.
+- **Tuning blind.** Always compare to the original visually (the gallery) before locking parameters.
 - **Editing the engine per logo.** Per-logo specifics belong in `build.py`, never in
   `scripts/vectorize.py`.
+- **Letting the showcase model redraw the logo.** The showcase step must reproduce the
+  vectorized mark faithfully (recolor + composite only); if a render alters it, regenerate.
+- **Treating `currentColor` as a replacement for the variant matrix.** It only collapses the
+  ink axis and works inline-only — keep the explicit black/white/transparent files.

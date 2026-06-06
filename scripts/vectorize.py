@@ -217,7 +217,12 @@ def subpath_d(segs):
 def path_el(contours_segs, fill, evenodd=False, note=""):
     """A <path> element from one or more contours. Pass several contours plus
     `evenodd=True` to knock the inner ones out as holes (the see-through trick:
-    with no background they are genuinely transparent)."""
+    with no background they are genuinely transparent).
+
+    `fill` is written verbatim, so besides a hex colour it accepts the keyword
+    `"currentColor"` — pair that with `background=None` in `render_svg` to emit a
+    single theme-adaptive SVG whose ink follows the CSS `color` of its host. See
+    `references/layer-structure.md`."""
     d = "".join(subpath_d(s) for s in contours_segs)
     fr = ' fill-rule="evenodd"' if evenodd else ""
     c = f"  <!-- {note} -->\n" if note else ""

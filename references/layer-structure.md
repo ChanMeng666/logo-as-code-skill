@@ -51,6 +51,38 @@ wordmark and crops the canvas height to the mark). Declare them as a list of tup
 and loop — one math definition produces every brand-ready file. See the monkey
 example's `VARIANTS` and `render(...)`.
 
+## Theme-adaptive (`currentColor`) variant
+
+Besides a hex colour, the `ink` can be the CSS keyword **`currentColor`**. Paired with
+`background=None` (transparent), this emits a *single* SVG whose ink is whatever CSS
+`color` the host element has:
+
+```python
+("web/logo-currentColor.svg", "currentColor", None, True)   # one VARIANTS row
+```
+
+```html
+<!-- inline the SVG, then drive its colour from CSS -->
+<span style="color:#111">…inline svg…</span>          <!-- black mark -->
+<span style="color:#fff">…inline svg…</span>          <!-- white mark -->
+
+<style>
+  .logo { color: #111 }
+  @media (prefers-color-scheme: dark) { .logo { color: #fff } }   <!-- auto dark/light -->
+</style>
+```
+
+This is **additive, not a replacement** for the explicit matrix:
+
+- It only collapses the **ink** axis. It cannot express the **background** axis
+  (on-white / on-black / transparent are still separate files).
+- It only works when the SVG is **inlined** into the DOM — `currentColor` does *not*
+  resolve for an SVG loaded via `<img src>` or as a CSS `background-image`.
+- The favicon / ICO pipeline (`rasterize.js`) needs a concrete fill, so keep the real
+  black/white variants for those.
+
+Use it as the convenient web-embed artifact; keep the matrix for everything else.
+
 ## Tips for identifying roles
 
 - Open the source SVG and toggle paths, or print each contour's bounding box, to see
