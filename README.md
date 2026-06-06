@@ -1,9 +1,30 @@
+<div align="center">
+
+<img src="examples/chan-monkey/out/monkey/chan-meng-monkey-black-on-white.svg" alt="logo-as-code preview" width="140" />
+
 # logo-as-code-skill
 
-A **Claude Code skill** that turns a hand-drawn / sketched / scanned logo into clean,
-reproducible **code** — fitting smooth cubic Bézier curves to the real outline to
-produce an editable SVG, a matrix of color/layout variants, and PNG/ICO/favicon
-exports.
+**Turn a hand-drawn logo into clean, reproducible code.**
+
+A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that fits smooth
+cubic Bézier curves to a sketched / scanned mark's real outline — producing an editable
+SVG, a matrix of color &amp; layout variants, and PNG / ICO / favicon exports.
+
+![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-d97757)
+![Python](https://img.shields.io/badge/Python-stdlib%20only-3776ab)
+![Node.js](https://img.shields.io/badge/Node.js-rasterize-339933)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
+
+</div>
+
+---
+
+A hand-drawn logo is charming but **unmeasurable** — a flat image, or an SVG of hundreds
+of hand-placed points that is rough, uneditable, and not truly scalable. This skill turns
+each contour into a small set of **smooth cubic Bézier curves** (genuine parametric
+polynomials), fitted *along the original outline* so the hand-drawn character survives,
+yet the result is fully mathematical: reproducible, infinitely scalable, parametrically
+tweakable, and diff-able in git.
 
 It generalizes the method developed for the
 [Chan Meng personal-brand logo](https://github.com/ChanMeng666/chan-meng-personal-brand-logo):
